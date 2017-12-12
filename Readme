@@ -1,0 +1,117 @@
+1 在网站 http://code.google.com/p/protobuf/downloads/list上可以下载 Protobuf 的源代码。然后解压编译安装便可以使用它了。
+安装步骤如下所示：
+ tar -xzf protobuf-2.1.0.tar.gz 
+ cd protobuf-2.1.0 
+ ./configure --prefix=/usr/local/protobuf
+ make 
+ make check 
+ make install 
+ 
+ 2 > sudo vim /etc/profile
+ 添加
+export PATH=$PATH:/usr/local/protobuf/bin/
+export PKG_CONFIG_PATH=/usr/local/protobuf/lib/pkgconfig/
+保存执行
+source /etc/profile
+
+同时 在~/.profile中添加上面两行代码，否则会出现登录用户找不到protoc命令
+
+3 > 配置动态链接库路径
+sudo vim /etc/ld.so.conf
+插入：
+/usr/local/protobuf/lib
+
+4 > su  #root 权限
+ldconfig
+
+5> 写消息文件：msg.proto
+[cpp] view plain copy
+package lm;   
+message helloworld   
+{   
+    required int32     id = 1;  // ID     
+    required string    str = 2;  // str    
+    optional int32     opt = 3;  //optional field   
+}  
+将消息文件msg.proto映射成cpp文件
+protoc -I=. --cpp_out=. msg.proto
+可以看到生成了
+msg.pb.h 和msg.pb.cc
+
+6> 写序列化消息的进程
+write.cc
+[cpp] view plain copy
+#include "msg.pb.h"  
+#include <fstream>  
+#include <iostream>  
+using namespace std;  
+  
+int main(void)   
+{   
+  
+    lm::helloworld msg1;   
+    msg1.set_id(101);   
+    msg1.set_str("hello");   
+    fstream output("./log", ios::out | ios::trunc | ios::binary);   
+  
+    if (!msg1.SerializeToOstream(&output)) {   
+        cerr << "Failed to write msg." << endl;   
+        return -1;   
+    }          
+    return 0;   
+}  
+编译 write.cc 
+ g++  msg.pb.cc write.cc -o write  `pkg-config --cflags --libs protobuf` -lpthread
+ 
+执行write 
+./write， 可以看到生成了log文件
+
+7> 写反序列化的进程
+reader.cc
+[cpp] view plain copy
+#include "msg.pb.h"  
+#include <fstream>  
+#include <iostream>  
+using namespace std;  
+  
+void ListMsg(const lm::helloworld & msg) {    
+    cout << msg.id() << endl;   
+    cout << msg.str() << endl;   
+}   
+  
+int main(int argc, char* argv[]) {   
+  
+    lm::helloworld msg1;   
+  
+    {   
+        fstream input("./log", ios::in | ios::binary);   
+        if (!msg1.ParseFromIstream(&input)) {   
+            cerr << "Failed to parse address book." << endl;   
+            return -1;   
+        }         
+    }   
+  
+    ListMsg(msg1);   
+}  
+编译：g++  msg.pb.cc reader.cc -o reader  `pkg-config --cflags --libs protobuf` -lpthread
+执行./reader 输出 ：
+101
+hello
+
+8> 写Makefile文件
+[cpp] view plain copy
+all: write reader  
+  
+clean:  
+    rm -f write reader msg.*.cc msg.*.h *.o  log  
+  
+proto_msg:  
+    protoc --cpp_out=. msg.proto  
+  
+  
+write: msg.pb.cc write.cc  
+    g++  msg.pb.cc write.cc -o write  `pkg-config --cflags --libs protobuf`  
+  
+reader: msg.pb.cc reader.cc  
+    g++  msg.pb.cc reader.cc -o reader  `pkg-config --cflags --libs protobuf`  
+

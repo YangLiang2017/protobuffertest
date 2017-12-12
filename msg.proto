@@ -1,0 +1,7 @@
+package lm;   
+message helloworld   
+{   
+    required int32     uuid = 1;  // ID     
+    required string    str_license = 2;  // str    
+    optional int32     opt_for_test = 3;  //optional field   
+}  
